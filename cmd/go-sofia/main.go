@@ -31,18 +31,29 @@ func main() {
 		fmt.Fprintf(w, http.StatusText(http.StatusOK))
 	})
 
+	possibleErrors := make(chan error, 2)
+
 	go func() {
 		log.Print("The application server is about to handle connections...")
-		err := http.ListenAndServe(":"+blPort, router)
+		server := &http.Server{
+			Addr:    ":" + blPort,
+			Handler: router,
+		}
+		err := server.ListenAndServe()
 		if err != nil {
-			log.Fatal(err)
+			possibleErrors <- err
 		}
 	}()
+
+	select {
+	case err := <-possibleErrors:
+		log.Fatal(err)
+	}
 
 	diagnostics := diagnostics.NewDiagnostics()
 	log.Print("The diagnostics server is about to handle connections...")
 	err := http.ListenAndServe(":"+diagPort, diagnostics)
 	if err != nil {
-		log.Fatal(err)
+		possibleErrors <- err
 	}
 }
